@@ -1,6 +1,6 @@
 # 🤖 Discord AI Assistant
 
-<div align="center">
+
 
 [![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](https://choosealicense.com/licenses/mit/)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D16.9.0-brightgreen.svg)](https://nodejs.org/)
@@ -12,9 +12,10 @@
 [![TypeScript Support](https://img.shields.io/badge/TypeScript-Ready-blue.svg)](https://www.typescriptlang.org/)
 [![AI Models](https://img.shields.io/badge/AI_Models-11+-purple.svg)](https://1min.ai)
 
-</div>
+A powerful Discord bot offering AI chat with multiple models — including GPT-4o, Claude, Gemini, Perplexity, and more — all powered by the 1min.ai API. Lifetime subscription deals are often available online.
 
-A powerful Discord bot that provides AI chat functionality with multiple models including GPT-4o, Claude, Gemini, Perplexity and others through the 1min.ai API.
+
+
 
 ## 📸 Preview
 
