@@ -1,0 +1,43 @@
+{
+  "name": "discord-ai-assistant",
+  "version": "1.0.0",
+  "description": "A Discord bot that provides AI chat functionality with multiple models including GPT-4o, Claude, Gemini, and others",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "deploy": "node deploy-commands.js",
+    "deploy:global": "GUILD_ID= node deploy-commands.js"
+  },
+  "keywords": [
+    "discord",
+    "bot",
+    "ai",
+    "chatbot",
+    "gpt",
+    "claude",
+    "gemini",
+    "1min.ai"
+  ],
+  "author": "gl0bal01",
+  "license": "MIT",
+  "dependencies": {
+    "discord.js": "^14.16.3",
+    "axios": "^1.7.7",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.7"
+  },
+  "engines": {
+    "node": ">=16.9.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gl0bal01/discord-ai-assistant.git"
+  },
+  "bugs": {
+    "url": "https://github.com/gl0bal01/discord-ai-assistant/issues"
+  },
+  "homepage": "https://github.com/gl0bal01/discord-ai-assistant#readme"
+}
