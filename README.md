@@ -288,17 +288,12 @@ The bot supports these AI models through 1min.ai:
 
 ## 📈 Stats & Performance
 
-<div align="center">
-
 | Metric | Value |
 |--------|-------|
-| Response Time | < 10 seconds |
 | Uptime | 99.9% |
 | Supported Models | 11+ |
 | Max Message Length | 2000 chars |
 | File Attachments | Unlimited |
-
-</div>
 
 
 ## 🐛 Troubleshooting
@@ -331,15 +326,12 @@ Check the console output for detailed error messages.
 
 ## 🔗 Quick Links
 
-<div align="center">
-
 | Resource | Link |
 |----------|------|
 | 🐛 Report Bug | [Issues](https://github.com/gl0bal01/discord-ai-assistant/issues/new?template=bug_report.md) |
 | ✨ Request Feature | [Feature Request](https://github.com/gl0bal01/discord-ai-assistant/issues/new?template=feature_request.md) |
 | 🚀 1min.ai API | [Get API Key](https://1min.ai) |
 
-</div>
 
 ## 📄 License
 
