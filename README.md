@@ -19,13 +19,23 @@ A powerful Discord bot offering AI chat with multiple models — including GPT-4
 
 ## 📸 Preview
 
-### /ai chat message:Histoire d'un enfant qui mange une tarte et qui met une tarte à son copain model: DeepSeek R1
+<details>
+<summary>Screenshot: Reasoning with DeepSeek R1</summary>
+ 
+  **/ai chat message:Histoire d'un enfant qui mange une tarte et qui met une tarte à son copain model: DeepSeek R1**
 
-![Discord AI Assistant Reasoning](/assets/ai-reasoning.png)
+  ![Discord AI Assistant Reasoning](/assets/ai-reasoning.png)
+</details>
 
-### /ai code prompt:quicksort in go
+
+<details>
+<summary>Screenshot: Coding with Gpt-4o</summary>
+  
+**/ai code prompt:quicksort in go**
 
 ![Discord AI Assistant Reasoning](/assets/ai-code.png)
+
+</details>
 
 *Experience seamless AI conversations directly in your Discord server*
 
@@ -37,8 +47,6 @@ A powerful Discord bot offering AI chat with multiple models — including GPT-4
 
 - [🤖 Discord AI Assistant](#-discord-ai-assistant)
   - [📸 Preview](#-preview)
-    - [/ai chat message:Histoire d'un enfant qui mange une tarte et qui met une tarte à son copain model: DeepSeek R1](#ai-chat-messagehistoire-dun-enfant-qui-mange-une-tarte-et-qui-met-une-tarte-à-son-copain-model-deepseek-r1)
-    - [/ai code prompt:quicksort in go](#ai-code-promptquicksort-in-go)
   - [📝 Table of Contents](#-table-of-contents)
   - [✨ Features](#-features)
   - [🚀 Available Commands](#-available-commands)
@@ -73,7 +81,7 @@ A powerful Discord bot offering AI chat with multiple models — including GPT-4
   - [🤝 Contributing](#-contributing)
   - [🆘 Support](#-support)
   - [🙏 Acknowledgments](#-acknowledgments)
-    - [⭐ Star this repo if you find it helpful!](#-star-this-repo-if-you-find-it-helpful)
+  - [⭐ Star this repo if you find it helpful!](#-star-this-repo-if-you-find-it-helpful)
 
 </details>
 
@@ -367,7 +375,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 [![Discord](https://img.shields.io/badge/Discord-Support_Server-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/your-invite)
 [![1min.ai](https://img.shields.io/badge/Powered_by-1min.ai-FF6B6B?style=for-the-badge)](https://1min.ai)
 
-### ⭐ Star this repo if you find it helpful!
+## ⭐ Star this repo if you find it helpful!
 
 *Want to contribute? We welcome PRs, bug reports, and feature requests!*
 
