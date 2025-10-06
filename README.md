@@ -11,6 +11,7 @@
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](http://makeapullrequest.com)
 [![TypeScript Support](https://img.shields.io/badge/TypeScript-Ready-blue.svg)](https://www.typescriptlang.org/)
 [![AI Models](https://img.shields.io/badge/AI_Models-11+-purple.svg)](https://1min.ai)
+[![GitHub](https://img.shields.io/badge/GitHub-gl0bal01-181717?logo=github&logoColor=white)](https://github.com/gl0bal01)
 
 A powerful Discord bot offering AI chat with multiple models — including GPT-4o, Claude, Gemini, Perplexity, and more — all powered by the 1min.ai API. Lifetime subscription deals are often available online.
 
