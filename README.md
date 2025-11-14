@@ -15,8 +15,11 @@
 
 A powerful Discord bot offering AI chat with multiple models — including GPT-4o, Claude, Gemini, Perplexity, and more — all powered by the 1min.ai API. Lifetime subscription deals are often available online.
 
+---
 
+🔥 If you want to use 1min.ai from the command line, I’ve got your back — my **[llm-1minai](https://github.com/gl0bal01/llm-1minai)** CLI is even more powerful, and you can mix it up with **[Datasette](https://github.com/simonw/datasette)** thanks to its plugin support in **[Simon Willison’s LLM ecosystem](https://llm.datasette.io/en/stable/)**.
 
+---
 
 ## 📸 Preview
 
