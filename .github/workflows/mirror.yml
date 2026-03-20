@@ -12,12 +12,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Configure Git
-        run: |
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "actions@github.com"
       - name: Mirror repository
+        env:
+          CODEBERG_TOKEN: ${{ secrets.CODEBERG_TOKEN }}
         run: |
-          git remote add codeberg https://gl0bal01:${{ secrets.CODEBERG_TOKEN }}@codeberg.org/gl0bal01/discord-ai-assistant.git || true
-          git push codeberg --all --force
-          git push codeberg --tags --force
+          git remote add codeberg https://codeberg.org/gl0bal01/discord-ai-assistant.git || true
+          git -c http.https://codeberg.org/.extraheader="Authorization: basic $(echo -n "gl0bal01:${CODEBERG_TOKEN}" | base64)" push codeberg --all --force
+          git -c http.https://codeberg.org/.extraheader="Authorization: basic $(echo -n "gl0bal01:${CODEBERG_TOKEN}" | base64)" push codeberg --tags --force

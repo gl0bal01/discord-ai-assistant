@@ -1,32 +1,111 @@
 /**
  * File: ai.js
  * Description: AI Assistant command for Discord Bot
- * 
+ *
  * This command provides AI chat functionality with multiple models including
  * GPT-4o, Claude 4 Sonnet, Gemini, Sonar Pro/Reasoning and others through the 1min.ai API.
- * 
- * Features:
- * - Multi-model AI chat support
- * - Code generation with dedicated context
- * - Conversation context management per user/model
- * - Automatic long response handling via file attachments
- * - Smart command suggestions
- * 
+ *
  * Version: 1.0.0
  * Author: gl0bal01
  * Tags: Discord, AI, GPT, Claude, Gemini, Perplexity
  */
 
-const { SlashCommandBuilder, AttachmentBuilder, MessageFlags } = require('discord.js');
+const { SlashCommandBuilder, AttachmentBuilder, PermissionFlagsBits } = require('discord.js');
 const axios = require('axios');
 
-// Map to store conversation IDs for each user
-const userConversations = new Map();
+// --- Rate limiter ---
+const RATE_LIMIT_MAX = parseInt(process.env.RATE_LIMIT_MAX, 10) || 10;
+const RATE_LIMIT_WINDOW_MS = parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10) || 60000;
+const rateLimitMap = new Map(); // userId -> { count, resetAt }
+
+function checkRateLimit(userId) {
+  const now = Date.now();
+  const entry = rateLimitMap.get(userId);
+
+  if (!entry || now >= entry.resetAt) {
+    rateLimitMap.set(userId, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return true;
+  }
+
+  if (entry.count >= RATE_LIMIT_MAX) {
+    const remainingSec = Math.ceil((entry.resetAt - now) / 1000);
+    return remainingSec;
+  }
+
+  entry.count++;
+  return true;
+}
+
+// --- Conversation store with TTL eviction ---
+const CONVERSATION_TTL_MS = 30 * 60 * 1000; // 30 minutes
+const MAX_USERS = 1000;
+const userConversations = new Map(); // userId -> { lastAccess, conversations: Map }
+
+function getConversations(userId) {
+  let entry = userConversations.get(userId);
+  if (!entry) {
+    entry = { lastAccess: Date.now(), conversations: new Map() };
+    userConversations.set(userId, entry);
+  } else {
+    entry.lastAccess = Date.now();
+  }
+  return entry.conversations;
+}
+
+function evictStaleConversations() {
+  const now = Date.now();
+  for (const [userId, entry] of userConversations) {
+    if (now - entry.lastAccess > CONVERSATION_TTL_MS) {
+      userConversations.delete(userId);
+    }
+  }
+  // Hard cap: evict oldest if over limit
+  if (userConversations.size > MAX_USERS) {
+    let oldest = null;
+    let oldestTime = Infinity;
+    for (const [userId, entry] of userConversations) {
+      if (entry.lastAccess < oldestTime) {
+        oldest = userId;
+        oldestTime = entry.lastAccess;
+      }
+    }
+    if (oldest) userConversations.delete(oldest);
+  }
+}
+
+// Run eviction every 5 minutes
+setInterval(evictStaleConversations, 5 * 60 * 1000);
+
+// --- Axios instance with timeout ---
+const API_BASE = 'https://api.1min.ai/api';
+const API_TIMEOUT_MS = 60000;
+
+function createApiClient() {
+  const apiKey = process.env.AI_TOKEN;
+  return axios.create({
+    baseURL: API_BASE,
+    timeout: API_TIMEOUT_MS,
+    headers: {
+      'API-KEY': apiKey,
+      'Content-Type': 'application/json'
+    }
+  });
+}
+
+// --- Helpers ---
+const MAX_PROMPT_LENGTH = 2000;
+
+function sanitizeResponse(text) {
+  if (typeof text !== 'string') return text;
+  // Strip Discord mentions that could cause mass pings
+  return text.replace(/@(everyone|here)/g, '@\u200b$1');
+}
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('ai')
     .setDescription('Interact with AI Assistant')
+    .setDefaultMemberPermissions(PermissionFlagsBits.SendMessages)
     .addSubcommand(subcommand =>
       subcommand
         .setName('chat')
@@ -35,7 +114,8 @@ module.exports = {
           option
             .setName('message')
             .setDescription('Your message to AI')
-            .setRequired(true))
+            .setRequired(true)
+            .setMaxLength(MAX_PROMPT_LENGTH))
         .addStringOption(option =>
           option
             .setName('model')
@@ -63,7 +143,8 @@ module.exports = {
           option
             .setName('prompt')
             .setDescription('Your code generation prompt')
-            .setRequired(true))
+            .setRequired(true)
+            .setMaxLength(MAX_PROMPT_LENGTH))
         .addStringOption(option =>
           option
             .setName('model')
@@ -71,7 +152,7 @@ module.exports = {
             .setRequired(false)
             .addChoices(
               { name: 'Claude 3.7 Sonnet', value: 'claude-3-7-sonnet-20250219' },
-   	          { name: 'Claude 4 Sonnet', value: 'claude-sonnet-4-20250514' },
+              { name: 'Claude 4 Sonnet', value: 'claude-sonnet-4-20250514' },
               { name: 'GPT-4o (Default)', value: 'gpt-4o' },
               { name: 'DeepSeek Chat', value: 'deepseek-chat' },
               { name: 'DeepSeek R1', value: 'deepseek-reasoner' }
@@ -108,160 +189,111 @@ module.exports = {
             ))),
 
   async execute(interaction) {
+    const userId = interaction.user.id;
+    const subcommand = interaction.options.getSubcommand();
+
+    // Rate limit check (skip for reset)
+    if (subcommand !== 'reset') {
+      const rateCheck = checkRateLimit(userId);
+      if (rateCheck !== true) {
+        return interaction.reply({
+          content: `You're sending requests too fast. Try again in ${rateCheck}s.`,
+          ephemeral: true
+        });
+      }
+    }
+
     await interaction.deferReply();
 
-    const API_KEY = process.env.AI_TOKEN;
-    if (!API_KEY) {
-      return interaction.editReply({
-        content: '❌ **Error:** API key not found! Please check your environment variables.',
-        flags: MessageFlags.Ephemeral
-      });
-    }
-
+    const api = createApiClient();
     const maxDiscordLength = 2000;
-    const subcommand = interaction.options.getSubcommand();
-    const userId = interaction.user.id;
+    const conversations = getConversations(userId);
 
-    // Initialize conversations map for this user if it doesn't exist
-    if (!userConversations.has(userId)) {
-      userConversations.set(userId, new Map());
-    }
-
-    // Progress indicator
-    let secondsElapsed = 0;
-    const progressTimer = setInterval(async () => {
-      secondsElapsed++;
-      try {
-        await interaction.editReply(`🤖 Processing your request... ${secondsElapsed}s elapsed`);
-      } catch (err) {
-        console.error('Progress update error:', err);
-      }
-    }, 1000);
+    let progressTimer = null;
+    let progressDone = false;
 
     try {
       // Handle reset subcommand
       if (subcommand === 'reset') {
-        clearInterval(progressTimer);
         const modelToReset = interaction.options.getString('model') || 'all';
-        
+
         if (modelToReset === 'all') {
-          userConversations.get(userId).clear();
-          return interaction.editReply('✅ All conversation contexts have been reset.');
+          conversations.clear();
+          return interaction.editReply('All conversation contexts have been reset.');
         } else if (modelToReset === 'code') {
-          userConversations.get(userId).delete('code_context');
-          return interaction.editReply('✅ Code conversation context has been reset.');
+          conversations.delete('code_context');
+          return interaction.editReply('Code conversation context has been reset.');
         } else {
-          userConversations.get(userId).delete(modelToReset);
-          return interaction.editReply(`✅ Conversation context for **${modelToReset}** has been reset.`);
+          conversations.delete(modelToReset);
+          return interaction.editReply(`Conversation context for **${modelToReset}** has been reset.`);
         }
       }
+
+      // Start progress indicator (5s interval to avoid Discord rate limits)
+      let secondsElapsed = 0;
+      progressTimer = setInterval(async () => {
+        if (progressDone) return;
+        secondsElapsed += 5;
+        try {
+          await interaction.editReply(`Processing your request... ${secondsElapsed}s elapsed`);
+        } catch {
+          // Interaction may have expired
+        }
+      }, 5000);
 
       let apiResponse;
       if (subcommand === 'chat') {
         const message = interaction.options.getString('message');
         const model = interaction.options.getString('model') || 'gpt-4o-mini';
-        
-        // Smart suggestion for code-related requests
-        const codeKeywords = ['create', 'build', 'script', 'function', 'class', 'program', 'write code', 'generate code'];
-        const messageLC = message.toLowerCase();
-        const shouldUseCodeCommand = codeKeywords.some(keyword => messageLC.includes(keyword));
-        
-        if (shouldUseCodeCommand) {
-          clearInterval(progressTimer);
-          return interaction.editReply(
-            "💡 **Suggestion:** It looks like you're trying to generate code. Consider using `/ai code` instead for better code generation results with dedicated context!"
-          );
-        }
 
-        // Get or create conversation ID for this user and model
-        let conversationId = userConversations.get(userId).get(model);
-        
+        let conversationId = conversations.get(model);
+
         if (!conversationId) {
-          const conversationResponse = await axios.post(
-            'https://api.1min.ai/api/conversations',
-            {
-              title: `Discord Chat - ${interaction.user.username}`,
-              type: 'CHAT_WITH_AI',
-              model: model
-            },
-            {
-              headers: {
-                'API-KEY': API_KEY,
-                'Content-Type': 'application/json'
-              }
-            }
-          );
+          const conversationResponse = await api.post('/conversations', {
+            title: `Discord Chat - ${userId}`,
+            type: 'CHAT_WITH_AI',
+            model: model
+          });
           conversationId = conversationResponse.data.conversation.uuid;
-          userConversations.get(userId).set(model, conversationId);
+          conversations.set(model, conversationId);
         }
 
-        apiResponse = await axios.post(
-          'https://api.1min.ai/api/features',
-          {
-            type: 'CHAT_WITH_AI',
-            model: model,
-            conversationId: conversationId,
-            promptObject: { prompt: message }
-          },
-          {
-            headers: {
-              'API-KEY': API_KEY,
-              'Content-Type': 'application/json'
-            }
-          }
-        );
+        apiResponse = await api.post('/features', {
+          type: 'CHAT_WITH_AI',
+          model: model,
+          conversationId: conversationId,
+          promptObject: { prompt: message }
+        });
 
       } else if (subcommand === 'code') {
         const prompt = interaction.options.getString('prompt');
         const model = interaction.options.getString('model') || 'gpt-4o';
         const newContext = interaction.options.getBoolean('new_context') || false;
-        
+
         const codeContextKey = 'code_context';
-        let conversationId = userConversations.get(userId).get(codeContextKey);
-        
+        let conversationId = conversations.get(codeContextKey);
+
         if (newContext || !conversationId) {
-          const conversationResponse = await axios.post(
-            'https://api.1min.ai/api/conversations',
-            {
-              title: `Code Generation - ${interaction.user.username}`,
-              type: 'CODE_GENERATOR',
-              model: model
-            },
-            {
-              headers: {
-                'API-KEY': API_KEY,
-                'Content-Type': 'application/json'
-              }
-            }
-          );
+          const conversationResponse = await api.post('/conversations', {
+            title: `Code Generation - ${userId}`,
+            type: 'CODE_GENERATOR',
+            model: model
+          });
           conversationId = conversationResponse.data.conversation.uuid;
-          userConversations.get(userId).set(codeContextKey, conversationId);
+          conversations.set(codeContextKey, conversationId);
         }
 
-        apiResponse = await axios.post(
-          'https://api.1min.ai/api/features',
-          {
-            type: 'CODE_GENERATOR',
-            model: model,
-            conversationId: conversationId,
-            promptObject: { prompt: prompt }
-          },
-          {
-            headers: {
-              'API-KEY': API_KEY,
-              'Content-Type': 'application/json'
-            }
-          }
-        );
+        apiResponse = await api.post('/features', {
+          type: 'CODE_GENERATOR',
+          model: model,
+          conversationId: conversationId,
+          promptObject: { prompt: prompt }
+        });
       }
-
-      clearInterval(progressTimer);
 
       // Extract response from API
       let resultObject;
-      if (
-        apiResponse.data?.aiRecord?.aiRecordDetail?.resultObject
-      ) {
+      if (apiResponse.data?.aiRecord?.aiRecordDetail?.resultObject) {
         resultObject = apiResponse.data.aiRecord.aiRecordDetail.resultObject;
       } else if (apiResponse.data?.result?.response) {
         resultObject = apiResponse.data.result.response;
@@ -274,51 +306,58 @@ module.exports = {
       // Convert to readable string
       let resultText;
       if (Array.isArray(resultObject)) {
-        resultText = resultObject.join("\n");
+        resultText = resultObject.join('\n');
       } else if (typeof resultObject === 'object') {
         resultText = JSON.stringify(resultObject, null, 2);
       } else {
-        resultText = resultObject;
+        resultText = String(resultObject);
       }
 
-      // Determine model used and context info
-      const modelUsed = interaction.options.getString('model') || 
-                      (subcommand === 'chat' ? 'gpt-4o-mini' : 'claude-3-7-sonnet-20250219');
-      
-      let contextInfo = '';
-      if (subcommand === 'chat') {
-        contextInfo = `\n*Context ID: ${userConversations.get(userId).get(modelUsed)}*`;
-      } else if (subcommand === 'code') {
-        contextInfo = `\n*Code Context ID: ${userConversations.get(userId).get('code_context')}*`;
-      }
-      
-      const basePrefix = `**🤖 ${modelUsed}**${contextInfo}\n`;
+      // Sanitize Discord mentions
+      resultText = sanitizeResponse(resultText);
+
+      // Determine model used
+      const modelUsed = interaction.options.getString('model') ||
+        (subcommand === 'chat' ? 'gpt-4o-mini' : 'gpt-4o');
+
+      const basePrefix = `**${modelUsed}** (${subcommand})\n`;
       const safeLimit = Math.floor(maxDiscordLength * 0.75);
-      
+
       if (resultText.length <= (safeLimit - basePrefix.length)) {
         await interaction.editReply(basePrefix + resultText);
       } else {
-        const file = new AttachmentBuilder(Buffer.from(resultText, 'utf-8'), { 
-          name: `ai_${subcommand}_response.txt` 
+        const file = new AttachmentBuilder(Buffer.from(resultText, 'utf-8'), {
+          name: `ai_${subcommand}_response.txt`
         });
-        
+
         await interaction.editReply({
-          content: `**🤖 ${modelUsed}** (${subcommand})${contextInfo}\n📄 Response was too long for Discord. See attached file.`,
+          content: `${basePrefix}Response was too long for Discord. See attached file.`,
           files: [file]
         });
       }
 
     } catch (error) {
-      clearInterval(progressTimer);
-      console.error('AI API Error:', error.response?.data || error.message);
-      
-      const errorMessage = error.response?.status === 401 
-        ? '❌ **Authentication Error:** Invalid API key'
-        : error.response?.status === 429
-        ? '⏱️ **Rate Limited:** Please try again later'
-        : `❌ **Error:** ${error.message}`;
-      
-      await interaction.editReply(errorMessage);
+      console.error('AI API Error:', error.response?.status, error.message);
+
+      let userMessage;
+      if (error.response?.status === 401) {
+        userMessage = 'Authentication error. Please contact the bot administrator.';
+      } else if (error.response?.status === 429) {
+        userMessage = 'The AI service is rate limiting requests. Please try again later.';
+      } else if (error.code === 'ECONNABORTED') {
+        userMessage = 'The request timed out. Please try again with a shorter prompt.';
+      } else {
+        userMessage = 'An unexpected error occurred. Please try again later.';
+      }
+
+      try {
+        await interaction.editReply(userMessage);
+      } catch {
+        // Interaction may have expired
+      }
+    } finally {
+      progressDone = true;
+      if (progressTimer) clearInterval(progressTimer);
     }
   }
 };

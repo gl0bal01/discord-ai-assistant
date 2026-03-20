@@ -22,15 +22,18 @@
   "author": "gl0bal01",
   "license": "MIT",
   "dependencies": {
-    "discord.js": "^14.16.3",
-    "axios": "^1.7.7",
-    "dotenv": "^16.4.5"
+    "discord.js": "^14.25.1",
+    "axios": "^1.13.6",
+    "dotenv": "^17.3.1"
   },
   "devDependencies": {
-    "nodemon": "^3.1.7"
+    "nodemon": "^3.1.14"
+  },
+  "overrides": {
+    "undici": "^6.23.0"
   },
   "engines": {
-    "node": ">=16.9.0"
+    "node": ">=18.18.0"
   },
   "repository": {
     "type": "git",

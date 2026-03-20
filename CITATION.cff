@@ -14,9 +14,7 @@ keywords:
   - "Perplexity"
   - "Grok"
 authors:
-  - given-names: "Fabien"
-    family-names: "Grenier"
-    alias: "gl0bal01"
+  - alias: "gl0bal01"
     orcid: "https://orcid.org/0009-0003-0062-4876"
 repository-code: "https://github.com/gl0bal01/discord-ai-assistant"
 url: "https://github.com/gl0bal01/discord-ai-assistant"
