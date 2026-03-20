@@ -1,10 +1,10 @@
 # Discord AI Assistant
 
 [![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Node.js](https://img.shields.io/badge/node-%3E%3D16.9.0-brightgreen.svg)](https://nodejs.org/)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D18.18.0-brightgreen.svg)](https://nodejs.org/)
 [![DOI](https://zenodo.org/badge/1005640682.svg)](https://doi.org/10.5281/zenodo.15722664)
 
-A lightweight Discord bot that gives every member of your server access to 11+ AI models (GPT-4o, Claude 4 Sonnet, Gemini, DeepSeek, Sonar, Grok, and more) through a single `/ai` slash command — all routed through the [1min.ai](https://1min.ai) API.
+A lightweight Discord bot that gives every member of your server access to 12 AI models (GPT-4o, Claude Sonnet 4, Gemini, DeepSeek, Sonar, Grok, and others) through a single `/ai` slash command — all routed through the [1min.ai](https://1min.ai) API.
 
 No per-model API keys. No heavyweight framework. One `.env`, three dependencies, and you're running.
 
@@ -45,7 +45,7 @@ Long responses are automatically sent as file attachments. Model selection is a 
 |-------|------|-------|
 | GPT-4o Mini | General chat | Fast |
 | GPT-4o | Complex reasoning | Medium |
-| Claude 4 Sonnet | Advanced reasoning, code | Medium |
+| Claude Sonnet 4 | Advanced reasoning, code | Medium |
 | Claude 3.7 Sonnet | Code, analysis | Medium |
 | O3 Mini | Math, logic | Medium |
 | O1 Mini | Reasoning | Medium |
