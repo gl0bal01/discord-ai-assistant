@@ -2,16 +2,16 @@
  * Discord AI Assistant Bot
  *
  * A Discord bot that provides AI chat functionality with multiple models
- * including GPT-4o, Claude, Gemini, Perplexity and others through the 1min.ai API.
+ * including GPT-6, Claude, Gemini, Grok, Perplexity and others through the 1min.ai API.
  *
- * Version: 1.0.0
+ * Version: 2.0.0
  * Author: gl0bal01
  * Tags: Discord, AI, GPT, Claude, Gemini, Perplexity
  */
 
 const fs = require('node:fs');
 const path = require('node:path');
-const { Client, Collection, Events, GatewayIntentBits } = require('discord.js');
+const { Client, Collection, Events, GatewayIntentBits, MessageFlags } = require('discord.js');
 require('dotenv').config();
 
 // Validate required environment variables at startup
@@ -63,7 +63,7 @@ client.once(Events.ClientReady, readyClient => {
   }
 
   // Set bot status
-  client.user.setActivity('with AI models | /ai', { type: 'PLAYING' });
+  client.user.setActivity('with AI models | /ai');
 });
 
 // Handle slash command interactions
@@ -74,7 +74,7 @@ client.on(Events.InteractionCreate, async interaction => {
   if (ALLOWED_GUILDS.length > 0 && !ALLOWED_GUILDS.includes(interaction.guildId)) {
     return interaction.reply({
       content: 'This bot is not authorized for this server.',
-      ephemeral: true
+      flags: MessageFlags.Ephemeral
     });
   }
 
@@ -92,7 +92,7 @@ client.on(Events.InteractionCreate, async interaction => {
 
     const errorMessage = {
       content: 'There was an error while executing this command.',
-      ephemeral: true
+      flags: MessageFlags.Ephemeral
     };
 
     try {

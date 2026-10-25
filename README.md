@@ -1,10 +1,10 @@
 # Discord AI Assistant
 
 [![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Node.js](https://img.shields.io/badge/node-%3E%3D18.18.0-brightgreen.svg)](https://nodejs.org/)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D22-brightgreen.svg)](https://nodejs.org/)
 [![DOI](https://zenodo.org/badge/1005640682.svg)](https://doi.org/10.5281/zenodo.15722664)
 
-A lightweight Discord bot that gives every member of your server access to 12 AI models (GPT-4o, Claude Sonnet 4, Gemini, DeepSeek, Sonar, Grok, and others) through a single `/ai` slash command — all routed through the [1min.ai](https://1min.ai) API.
+A lightweight Discord bot that gives every member of your server access to 25+ current AI models (Claude 5.5, GPT-6, Gemini 4, Grok 4.7, DeepSeek V4, Kimi K3, Sonar, and others) through a single `/ai` slash command — all routed through the [1min.ai](https://1min.ai) API.
 
 No per-model API keys. No heavyweight framework. One `.env`, three dependencies, and you're running.
 
@@ -41,25 +41,42 @@ Long responses are automatically sent as file attachments. Model selection is a 
 
 ## Supported models
 
-| Model | Type | Speed |
-|-------|------|-------|
-| GPT-4o Mini | General chat | Fast |
-| GPT-4o | Complex reasoning | Medium |
-| Claude Sonnet 4 | Advanced reasoning, code | Medium |
-| Claude 3.7 Sonnet | Code, analysis | Medium |
-| O3 Mini | Math, logic | Medium |
-| O1 Mini | Reasoning | Medium |
-| Gemini 1.5 Pro | Multimodal | Medium |
-| DeepSeek Chat | General purpose | Medium |
-| DeepSeek R1 | Chain-of-thought reasoning | Slow |
-| Grok 2 | Creative, conversational | Medium |
-| Sonar / Sonar Reasoning | Web-grounded search | Medium/Slow |
+Model IDs come from the live [1min.ai roster](https://api.1min.ai/models?feature=UNIFY_CHAT_WITH_AI). Cost is relative 1min.ai credit usage ($ cheapest, $$$$ priciest).
+
+**`/ai chat`**
+
+| Model | Best for | Cost |
+|-------|----------|------|
+| Claude Haiku 5.5 (default) | Fast everyday chat | $ |
+| Claude Sonnet 5.5 | Coding, knowledge work | $$ |
+| Claude Opus 5.5 | Complex reasoning, agentic coding | $$$ |
+| Claude Fable 5.1 | Frontier reasoning | $$$$ |
+| GPT-6 Luna | Fast routine tasks | $ |
+| GPT-6.1 Sol | Coding, professional work | $$ |
+| GPT-6 Astra | OpenAI flagship | $$$$ |
+| Gemini 3.8 Flash | Reasoning, coding | $$ |
+| Gemini 4 Argon | Google flagship | $$$ |
+| Grok 4.7 | Coding, knowledge work | $$ |
+| DeepSeek V4.1 Flash | Fast everyday chat | $ |
+| DeepSeek V4 Pro | Reasoning, long context | $$ |
+| Qwen3.8 Max | Reasoning, multilingual | $$ |
+| Kimi K3 | Long-horizon coding and research | $$$ |
+| GLM-5.3 | Agentic coding | $$ |
+| Mistral Medium 3.5 | Agentic workflows | $$ |
+| Muse Wonder | Long-horizon reasoning | $$$ |
+| Sonar / Sonar Pro | Web search with citations | $ / $$$ |
+| Sonar Reasoning Pro | Web search + reasoning | $$ |
+| Sonar Deep Research | Multi-source research (slow) | $$ |
+
+**`/ai code`**: Claude Sonnet 5.5 (default), Claude Opus 5.5, GPT-6.1 Sol, Gemini 4 Argon, Grok 4.7, Kimi K2.7 Code, Qwen3 Coder Plus, DeepSeek V4 Pro, GLM-5.3.
+
+Check every choice against the live API (spends credits) with `bun run check:models`, or a subset with `bun run check:models sonar`.
 
 ## Setup
 
 ### Prerequisites
 
-- Node.js >= 18.18.0
+- Node.js >= 22
 - A [Discord application](https://discord.com/developers/applications) with a bot token
 - A [1min.ai](https://1min.ai) API key
 
@@ -136,6 +153,8 @@ Required permissions: Send Messages, Use Slash Commands, Attach Files.
 discord-ai-assistant/
 ├── commands/
 │   └── ai.js            # All /ai subcommands
+├── scripts/
+│   └── check-models.js  # Live smoke test of every model choice
 ├── index.js              # Bot client, command loader, event handlers
 ├── deploy-commands.js    # Slash command registration script
 ├── .env.example          # Environment template

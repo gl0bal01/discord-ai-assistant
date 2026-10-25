@@ -2,15 +2,15 @@
  * File: ai.js
  * Description: AI Assistant command for Discord Bot
  *
- * This command provides AI chat functionality with multiple models including
- * GPT-4o, Claude 4 Sonnet, Gemini, Sonar Pro/Reasoning and others through the 1min.ai API.
+ * This command provides AI chat functionality with multiple models through the
+ * latest 1min.ai API.
  *
- * Version: 1.0.0
+ * Version: 2.0.0
  * Author: gl0bal01
  * Tags: Discord, AI, GPT, Claude, Gemini, Perplexity
  */
 
-const { SlashCommandBuilder, AttachmentBuilder, PermissionFlagsBits } = require('discord.js');
+const { SlashCommandBuilder, AttachmentBuilder, PermissionFlagsBits, MessageFlags } = require('discord.js');
 const axios = require('axios');
 
 // --- Rate limiter ---
@@ -78,7 +78,7 @@ setInterval(evictStaleConversations, 5 * 60 * 1000);
 
 // --- Axios instance with timeout ---
 const API_BASE = 'https://api.1min.ai/api';
-const API_TIMEOUT_MS = 60000;
+const API_TIMEOUT_MS = 120000; // 1min.ai generation deadline is two minutes
 
 function createApiClient() {
   const apiKey = process.env.AI_TOKEN;
@@ -101,6 +101,52 @@ function sanitizeResponse(text) {
   return text.replace(/@(everyone|here)/g, '@\u200b$1');
 }
 
+// Model roster from https://api.1min.ai/models?feature=UNIFY_CHAT_WITH_AI|CODE_GENERATOR
+// Discord allows max 25 choices per option; reset reuses CHAT_MODELS plus 2 extras.
+const CHAT_MODELS = [
+  { name: 'Claude Haiku 5.5', value: 'us.anthropic.claude-haiku-5-5' },
+  { name: 'Claude Sonnet 5.5', value: 'us.anthropic.claude-sonnet-5-5' },
+  { name: 'Claude Opus 5.5', value: 'us.anthropic.claude-opus-5-5' },
+  { name: 'Claude Fable 5.1', value: 'us.anthropic.claude-fable-5-1' },
+  { name: 'GPT-6 Luna', value: 'gpt-6-luna' },
+  { name: 'GPT-6.1 Sol', value: 'gpt-6.1-sol' },
+  { name: 'GPT-6 Astra', value: 'gpt-6-astra' },
+  { name: 'Gemini 3.8 Flash', value: 'gemini-3.8-flash' },
+  { name: 'Gemini 4 Argon', value: 'gemini-4-argon' },
+  { name: 'Grok 4.7', value: 'grok-4.7' },
+  { name: 'DeepSeek V4.1 Flash', value: 'deepseek-flash' },
+  { name: 'DeepSeek V4 Pro', value: 'deepseek-v4-pro' },
+  { name: 'Qwen3.8 Max', value: 'qwen3.8-max' },
+  { name: 'Kimi K3', value: 'moonshotai/kimi-k3' },
+  { name: 'GLM-5.3', value: 'glm-5.3' },
+  { name: 'Mistral Medium 3.5', value: 'mistral-medium-3-5' },
+  { name: 'Muse Wonder', value: 'meta/muse-wonder' },
+  { name: 'Sonar', value: 'sonar' },
+  { name: 'Sonar Pro', value: 'sonar-pro' },
+  { name: 'Sonar Reasoning Pro', value: 'sonar-reasoning-pro' },
+  { name: 'Sonar Deep Research', value: 'sonar-deep-research' }
+];
+const CODE_MODELS = [
+  { name: 'Claude Sonnet 5.5', value: 'us.anthropic.claude-sonnet-5-5' },
+  { name: 'Claude Opus 5.5', value: 'us.anthropic.claude-opus-5-5' },
+  { name: 'GPT-6.1 Sol', value: 'gpt-6.1-sol' },
+  { name: 'Gemini 4 Argon', value: 'gemini-4-argon' },
+  { name: 'Grok 4.7', value: 'grok-4.7' },
+  { name: 'Kimi K2.7 Code', value: 'moonshotai/kimi-k2.7-code' },
+  { name: 'Qwen3 Coder Plus', value: 'qwen3-coder-plus' },
+  { name: 'DeepSeek V4 Pro', value: 'deepseek-v4-pro' },
+  { name: 'GLM-5.3', value: 'glm-5.3' }
+];
+const CHAT_DEFAULT_MODEL = 'us.anthropic.claude-haiku-5-5';
+const CODE_DEFAULT_MODEL = 'us.anthropic.claude-sonnet-5-5';
+const MODEL_LABELS = new Map([...CHAT_MODELS, ...CODE_MODELS].map(m => [m.value, m.name]));
+const WEB_SEARCH_MODELS = new Set([
+  'sonar',
+  'sonar-pro',
+  'sonar-reasoning-pro',
+  'sonar-deep-research'
+]);
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('ai')
@@ -119,22 +165,9 @@ module.exports = {
         .addStringOption(option =>
           option
             .setName('model')
-            .setDescription('AI model to use')
+            .setDescription(`AI model to use (default: ${MODEL_LABELS.get(CHAT_DEFAULT_MODEL)})`)
             .setRequired(false)
-            .addChoices(
-              { name: 'GPT-4o Mini (Default)', value: 'gpt-4o-mini' },
-              { name: 'GPT-4o', value: 'gpt-4o' },
-              { name: 'Claude 3.7 Sonnet', value: 'claude-3-7-sonnet-20250219' },
-              { name: 'Claude 4 Sonnet', value: 'claude-sonnet-4-20250514' },
-              { name: 'O3 Mini', value: 'o3-mini' },
-              { name: 'O1 Mini', value: 'o1-mini' },
-              { name: 'Gemini 1.5 Pro', value: 'gemini-1.5-pro' },
-              { name: 'Sonar Reasoning', value: 'sonar-reasoning' },
-              { name: 'Sonar', value: 'sonar' },
-              { name: 'DeepSeek Chat', value: 'deepseek-chat' },
-              { name: 'DeepSeek R1', value: 'deepseek-reasoner' },
-              { name: 'Grok 2', value: 'grok-2' }
-            )))
+            .addChoices(...CHAT_MODELS)))
     .addSubcommand(subcommand =>
       subcommand
         .setName('code')
@@ -148,15 +181,9 @@ module.exports = {
         .addStringOption(option =>
           option
             .setName('model')
-            .setDescription('AI model to use')
+            .setDescription(`AI model to use (default: ${MODEL_LABELS.get(CODE_DEFAULT_MODEL)})`)
             .setRequired(false)
-            .addChoices(
-              { name: 'Claude 3.7 Sonnet', value: 'claude-3-7-sonnet-20250219' },
-              { name: 'Claude 4 Sonnet', value: 'claude-sonnet-4-20250514' },
-              { name: 'GPT-4o (Default)', value: 'gpt-4o' },
-              { name: 'DeepSeek Chat', value: 'deepseek-chat' },
-              { name: 'DeepSeek R1', value: 'deepseek-reasoner' }
-            ))
+            .addChoices(...CODE_MODELS))
         .addBooleanOption(option =>
           option
             .setName('new_context')
@@ -173,18 +200,7 @@ module.exports = {
             .setRequired(false)
             .addChoices(
               { name: 'All Models', value: 'all' },
-              { name: 'GPT-4o Mini', value: 'gpt-4o-mini' },
-              { name: 'GPT-4o', value: 'gpt-4o' },
-              { name: 'Claude 3.7 Sonnet', value: 'claude-3-7-sonnet-20250219' },
-              { name: 'Claude 4 Sonnet', value: 'claude-sonnet-4-20250514' },
-              { name: 'O3 Mini', value: 'o3-mini' },
-              { name: 'O1 Mini', value: 'o1-mini' },
-              { name: 'Gemini 1.5 Pro', value: 'gemini-1.5-pro' },
-              { name: 'DeepSeek Chat', value: 'deepseek-chat' },
-              { name: 'DeepSeek R1', value: 'deepseek-reasoner' },
-              { name: 'Sonar Reasoning', value: 'sonar-reasoning' },
-              { name: 'Sonar', value: 'sonar' },
-              { name: 'Grok 2', value: 'grok-2' },
+              ...CHAT_MODELS,
               { name: 'Code Context', value: 'code' }
             ))),
 
@@ -198,7 +214,7 @@ module.exports = {
       if (rateCheck !== true) {
         return interaction.reply({
           content: `You're sending requests too fast. Try again in ${rateCheck}s.`,
-          ephemeral: true
+          flags: MessageFlags.Ephemeral
         });
       }
     }
@@ -225,7 +241,7 @@ module.exports = {
           return interaction.editReply('Code conversation context has been reset.');
         } else {
           conversations.delete(modelToReset);
-          return interaction.editReply(`Conversation context for **${modelToReset}** has been reset.`);
+          return interaction.editReply(`Conversation context for **${MODEL_LABELS.get(modelToReset) ?? modelToReset}** has been reset.`);
         }
       }
 
@@ -244,30 +260,51 @@ module.exports = {
       let apiResponse;
       if (subcommand === 'chat') {
         const message = interaction.options.getString('message');
-        const model = interaction.options.getString('model') || 'gpt-4o-mini';
+        const model = interaction.options.getString('model') || CHAT_DEFAULT_MODEL;
 
         let conversationId = conversations.get(model);
 
         if (!conversationId) {
           const conversationResponse = await api.post('/conversations', {
             title: `Discord Chat - ${userId}`,
-            type: 'CHAT_WITH_AI',
+            type: 'UNIFY_CHAT_WITH_AI',
             model: model
           });
           conversationId = conversationResponse.data.conversation.uuid;
           conversations.set(model, conversationId);
         }
 
-        apiResponse = await api.post('/features', {
-          type: 'CHAT_WITH_AI',
-          model: model,
+        const chatPromptObject = {
+          prompt: message,
           conversationId: conversationId,
-          promptObject: { prompt: message }
+          settings: {
+            historySettings: {
+              isMixed: false,
+              historyMessageLimit: 10
+            }
+          }
+        };
+
+        if (WEB_SEARCH_MODELS.has(model)) {
+          chatPromptObject.settings = {
+            ...chatPromptObject.settings,
+            webSearchSettings: {
+              webSearch: true,
+              numOfSite: model === 'sonar-deep-research' ? 10 : 5,
+              maxWord: 1000
+            }
+          };
+        }
+
+        apiResponse = await api.post('/chat-with-ai', {
+          type: 'UNIFY_CHAT_WITH_AI',
+          model: model,
+          promptObject: chatPromptObject
         });
 
       } else if (subcommand === 'code') {
         const prompt = interaction.options.getString('prompt');
-        const model = interaction.options.getString('model') || 'gpt-4o';
+        const model = interaction.options.getString('model') || CODE_DEFAULT_MODEL;
         const newContext = interaction.options.getBoolean('new_context') || false;
 
         const codeContextKey = 'code_context';
@@ -318,9 +355,9 @@ module.exports = {
 
       // Determine model used
       const modelUsed = interaction.options.getString('model') ||
-        (subcommand === 'chat' ? 'gpt-4o-mini' : 'gpt-4o');
+        (subcommand === 'chat' ? CHAT_DEFAULT_MODEL : CODE_DEFAULT_MODEL);
 
-      const basePrefix = `**${modelUsed}** (${subcommand})\n`;
+      const basePrefix = `**${MODEL_LABELS.get(modelUsed) ?? modelUsed}** (${subcommand})\n`;
       const safeLimit = Math.floor(maxDiscordLength * 0.75);
 
       if (resultText.length <= (safeLimit - basePrefix.length)) {
