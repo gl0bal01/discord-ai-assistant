@@ -5,7 +5,7 @@
  * This command provides AI chat functionality with multiple models through the
  * latest 1min.ai API.
  *
- * Version: 2.0.0
+ * Version: 2.0.1
  * Author: gl0bal01
  * Tags: Discord, AI, GPT, Claude, Gemini, Perplexity
  */
@@ -101,6 +101,15 @@ function sanitizeResponse(text) {
   return text.replace(/@(everyone|here)/g, '@\u200b$1');
 }
 
+// CODE_GENERATOR replies use 1min.ai's web UI format: <thinking>...</thinking>
+// followed by <artifact language="js">code</artifact>. Convert to Discord markdown.
+function formatArtifacts(text) {
+  return text
+    .replace(/<thinking>[\s\S]*?<\/thinking>\s*/g, '')
+    .replace(/<artifact\b([^>]*)>\n?([\s\S]*?)\n?<\/artifact>/g, (_, attrs, code) =>
+      '```' + (attrs.match(/language="([^"]*)"/)?.[1] ?? '') + '\n' + code + '\n```');
+}
+
 // Model roster from https://api.1min.ai/models?feature=UNIFY_CHAT_WITH_AI|CODE_GENERATOR
 // Discord allows max 25 choices per option; reset reuses CHAT_MODELS plus 2 extras.
 const CHAT_MODELS = [
@@ -129,11 +138,9 @@ const CHAT_MODELS = [
 const CODE_MODELS = [
   { name: 'Claude Sonnet 5.5', value: 'us.anthropic.claude-sonnet-5-5' },
   { name: 'Claude Opus 5.5', value: 'us.anthropic.claude-opus-5-5' },
-  { name: 'GPT-6.1 Sol', value: 'gpt-6.1-sol' },
   { name: 'Gemini 4 Argon', value: 'gemini-4-argon' },
   { name: 'Grok 4.7', value: 'grok-4.7' },
   { name: 'Kimi K2.7 Code', value: 'moonshotai/kimi-k2.7-code' },
-  { name: 'Qwen3 Coder Plus', value: 'qwen3-coder-plus' },
   { name: 'DeepSeek V4 Pro', value: 'deepseek-v4-pro' },
   { name: 'GLM-5.3', value: 'glm-5.3' }
 ];
@@ -328,30 +335,22 @@ module.exports = {
         });
       }
 
-      // Extract response from API
-      let resultObject;
-      if (apiResponse.data?.aiRecord?.aiRecordDetail?.resultObject) {
-        resultObject = apiResponse.data.aiRecord.aiRecordDetail.resultObject;
-      } else if (apiResponse.data?.result?.response) {
-        resultObject = apiResponse.data.result.response;
-      } else {
-        resultObject = typeof apiResponse.data === 'string'
-          ? apiResponse.data
-          : JSON.stringify(apiResponse.data, null, 2);
+      // Extract response from API (resultObject is a list of strings)
+      const resultObject = apiResponse.data?.aiRecord?.aiRecordDetail?.resultObject ??
+        apiResponse.data?.result?.response;
+
+      // 1min.ai can report errors (e.g. INSUFFICIENT_CREDITS) with a 2xx status,
+      // either as the whole body or as an object in place of resultObject
+      if (resultObject == null || (typeof resultObject === 'object' && !Array.isArray(resultObject))) {
+        const noResult = new Error('AI API response has no result');
+        noResult.apiCode = resultObject?.code ?? apiResponse.data?.code ?? apiResponse.data?.errorCode;
+        throw noResult;
       }
 
-      // Convert to readable string
-      let resultText;
-      if (Array.isArray(resultObject)) {
-        resultText = resultObject.join('\n');
-      } else if (typeof resultObject === 'object') {
-        resultText = JSON.stringify(resultObject, null, 2);
-      } else {
-        resultText = String(resultObject);
-      }
+      let resultText = Array.isArray(resultObject) ? resultObject.join('\n') : String(resultObject);
 
       // Sanitize Discord mentions
-      resultText = sanitizeResponse(resultText);
+      resultText = sanitizeResponse(formatArtifacts(resultText));
 
       // Determine model used
       const modelUsed = interaction.options.getString('model') ||
@@ -374,13 +373,16 @@ module.exports = {
       }
 
     } catch (error) {
-      console.error('AI API Error:', error.response?.status, error.message);
+      const apiCode = error.apiCode ?? error.response?.data?.errorCode ?? error.response?.data?.code;
+      console.error('AI API Error:', error.response?.status, apiCode ?? '', error.message);
 
       let userMessage;
       if (error.response?.status === 401) {
         userMessage = 'Authentication error. Please contact the bot administrator.';
       } else if (error.response?.status === 429) {
         userMessage = 'The AI service is rate limiting requests. Please try again later.';
+      } else if (apiCode === 'INSUFFICIENT_CREDITS') {
+        userMessage = 'The AI service is out of credits. Please contact the bot administrator.';
       } else if (error.code === 'ECONNABORTED') {
         userMessage = 'The request timed out. Please try again with a shorter prompt.';
       } else {

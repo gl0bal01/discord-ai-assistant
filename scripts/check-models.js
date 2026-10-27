@@ -6,11 +6,10 @@
  *
  * Usage: bun run check:models [model-substring]
  *
- * Version: 2.0.0
+ * Version: 2.0.1
  * Author: gl0bal01
  */
 
-const { AsyncLocalStorage } = require('node:async_hooks');
 require('dotenv').config({ quiet: true });
 
 if (!process.env.AI_TOKEN) {
@@ -20,7 +19,6 @@ if (!process.env.AI_TOKEN) {
 
 const ai = require('../commands/ai.js');
 
-const CONCURRENCY = 4;
 const FEATURES = { chat: 'UNIFY_CHAT_WITH_AI', code: 'CODE_GENERATOR' };
 const PROMPTS = {
   chat: 'Reply with exactly one word: OK',
@@ -28,12 +26,11 @@ const PROMPTS = {
 };
 const filter = process.argv[2] || '';
 
-// Route the handler's console.error output to the case that produced it
-const als = new AsyncLocalStorage();
+// Capture the handler's console.error output for the case being run
+let currentLog = null;
 const originalError = console.error;
 console.error = (...args) => {
-  const log = als.getStore();
-  if (log) log.push(args.join(' '));
+  if (currentLog) currentLog.push(args.join(' '));
   else originalError(...args);
 };
 
@@ -64,9 +61,10 @@ async function run({ sub, model, label }, index) {
     }
   };
 
-  const log = [];
+  const log = currentLog = [];
   const started = Date.now();
-  await als.run(log, () => ai.execute(interaction));
+  await ai.execute(interaction);
+  currentLog = null;
   const seconds = ((Date.now() - started) / 1000).toFixed(1);
 
   const content = typeof reply === 'string' ? reply : reply?.content ?? '';
@@ -74,8 +72,9 @@ async function run({ sub, model, label }, index) {
   const body = typeof reply === 'object' && reply.files
     ? reply.files[0].attachment.toString('utf-8')
     : content.slice(prefix.length);
-  // A raw JSON body means the response had no aiRecord.aiRecordDetail.resultObject
-  const ok = content.startsWith(prefix) && body.trim() !== '' && !/^[[{]/.test(body.trimStart());
+  // Raw JSON or leftover 1min.ai web UI tags mean the reply was not cleaned up
+  const ok = content.startsWith(prefix) && body.trim() !== '' &&
+    !/^[[{]/.test(body.trimStart()) && !/<(thinking|artifact)\b/.test(body);
   const detail = ok ? body.trim().split('\n')[0].slice(0, 60) : (log.join(' | ') || content || body).slice(0, 300);
 
   return { ok, sub, model, seconds, detail };
@@ -97,17 +96,16 @@ async function run({ sub, model, label }, index) {
   console.log(`Roster: ${cases.length - retired.length}/${cases.length} choices active\n`);
 
   const live = cases.filter(c => !retired.includes(c));
-  console.log(`Checking ${live.length} model choice(s), ${CONCURRENCY} at a time...\n`);
+  // One at a time: 1min.ai reserves credits per in-flight call (Fable alone can
+  // reserve over a million), so parallel calls fail with INSUFFICIENT_CREDITS
+  console.log(`Checking ${live.length} model choice(s), one at a time...\n`);
 
-  const queue = live.map((c, i) => [c, i]);
   const results = [];
-  await Promise.all(Array.from({ length: CONCURRENCY }, async () => {
-    for (let next; (next = queue.shift());) {
-      const result = await run(...next);
-      results.push(result);
-      console.log(`${result.ok ? 'PASS' : 'FAIL'}  ${result.sub.padEnd(4)}  ${result.model.padEnd(32)}  ${result.seconds.padStart(5)}s  ${result.detail}`);
-    }
-  }));
+  for (const [index, c] of live.entries()) {
+    const result = await run(c, index);
+    results.push(result);
+    console.log(`${result.ok ? 'PASS' : 'FAIL'}  ${result.sub.padEnd(4)}  ${result.model.padEnd(32)}  ${result.seconds.padStart(5)}s  ${result.detail}`);
+  }
 
   const failed = results.filter(r => !r.ok);
   console.log(`\n${results.length - failed.length}/${results.length} passed`);

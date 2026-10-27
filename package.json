@@ -1,6 +1,6 @@
 {
   "name": "discord-ai-assistant",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "A Discord bot that provides AI chat functionality with multiple models including GPT-6, Claude, Gemini, Grok, and others",
   "main": "index.js",
   "scripts": {

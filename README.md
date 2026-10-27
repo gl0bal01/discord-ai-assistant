@@ -68,7 +68,7 @@ Model IDs come from the live [1min.ai roster](https://api.1min.ai/models?feature
 | Sonar Reasoning Pro | Web search + reasoning | $$ |
 | Sonar Deep Research | Multi-source research (slow) | $$ |
 
-**`/ai code`**: Claude Sonnet 5.5 (default), Claude Opus 5.5, GPT-6.1 Sol, Gemini 4 Argon, Grok 4.7, Kimi K2.7 Code, Qwen3 Coder Plus, DeepSeek V4 Pro, GLM-5.3.
+**`/ai code`**: Claude Sonnet 5.5 (default), Claude Opus 5.5, Gemini 4 Argon, Grok 4.7, Kimi K2.7 Code, DeepSeek V4 Pro, GLM-5.3.
 
 Check every choice against the live API (spends credits) with `bun run check:models`, or a subset with `bun run check:models sonar`.
 

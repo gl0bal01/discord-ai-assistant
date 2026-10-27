@@ -4,7 +4,7 @@
  * This script deploys slash commands to Discord.
  * Run this script whenever you add, modify, or remove commands.
  * 
- * Version: 2.0.0
+ * Version: 2.0.1
  * Author: gl0bal01
  * Tags: Discord, AI, GPT, Claude, Gemini, Perplexity
  */
