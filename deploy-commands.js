@@ -4,7 +4,7 @@
  * This script deploys slash commands to Discord.
  * Run this script whenever you add, modify, or remove commands.
  * 
- * Version: 2.0.1
+ * Version: 2.0.2
  * Author: gl0bal01
  * Tags: Discord, AI, GPT, Claude, Gemini, Perplexity
  */
@@ -12,7 +12,13 @@
 const { REST, Routes } = require('discord.js');
 const fs = require('node:fs');
 const path = require('node:path');
-require('dotenv').config();
+require('dotenv').config({ quiet: true });
+
+const missing = ['DISCORD_TOKEN', 'CLIENT_ID'].filter(key => !process.env[key]);
+if (missing.length > 0) {
+  console.error(`Missing required environment variables: ${missing.join(', ')}`);
+  process.exit(1);
+}
 
 const commands = [];
 
@@ -69,5 +75,6 @@ const rest = new REST().setToken(process.env.DISCORD_TOKEN);
     
   } catch (error) {
     console.error('❌ Error deploying commands:', error);
+    process.exitCode = 1;
   }
 })();

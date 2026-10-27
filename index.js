@@ -4,7 +4,7 @@
  * A Discord bot that provides AI chat functionality with multiple models
  * including GPT-6, Claude, Gemini, Grok, Perplexity and others through the 1min.ai API.
  *
- * Version: 2.0.1
+ * Version: 2.0.2
  * Author: gl0bal01
  * Tags: Discord, AI, GPT, Claude, Gemini, Perplexity
  */
@@ -12,7 +12,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { Client, Collection, Events, GatewayIntentBits, MessageFlags } = require('discord.js');
-require('dotenv').config();
+require('dotenv').config({ quiet: true });
 
 // Validate required environment variables at startup
 const REQUIRED_ENV = ['DISCORD_TOKEN', 'AI_TOKEN', 'CLIENT_ID'];
@@ -29,10 +29,12 @@ const ALLOWED_GUILDS = process.env.ALLOWED_GUILD_IDS
   : [];
 
 // Create a new client instance
+// AI output is untrusted: never let it ping @everyone, roles or users
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds
-  ]
+  ],
+  allowedMentions: { parse: [] }
 });
 
 // Create a collection for commands

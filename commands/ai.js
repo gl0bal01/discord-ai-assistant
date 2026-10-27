@@ -5,7 +5,7 @@
  * This command provides AI chat functionality with multiple models through the
  * latest 1min.ai API.
  *
- * Version: 2.0.1
+ * Version: 2.0.2
  * Author: gl0bal01
  * Tags: Discord, AI, GPT, Claude, Gemini, Perplexity
  */
@@ -41,40 +41,32 @@ const CONVERSATION_TTL_MS = 30 * 60 * 1000; // 30 minutes
 const MAX_USERS = 1000;
 const userConversations = new Map(); // userId -> { lastAccess, conversations: Map }
 
+// Map order doubles as LRU order: entries are re-inserted on every access
 function getConversations(userId) {
-  let entry = userConversations.get(userId);
-  if (!entry) {
-    entry = { lastAccess: Date.now(), conversations: new Map() };
-    userConversations.set(userId, entry);
-  } else {
-    entry.lastAccess = Date.now();
+  const entry = userConversations.get(userId) ?? { conversations: new Map() };
+  entry.lastAccess = Date.now();
+  userConversations.delete(userId);
+  userConversations.set(userId, entry);
+  // Hard cap: evict least recently used
+  if (userConversations.size > MAX_USERS) {
+    userConversations.delete(userConversations.keys().next().value);
   }
   return entry.conversations;
 }
 
-function evictStaleConversations() {
+function evictStaleEntries() {
   const now = Date.now();
   for (const [userId, entry] of userConversations) {
-    if (now - entry.lastAccess > CONVERSATION_TTL_MS) {
-      userConversations.delete(userId);
-    }
+    if (now - entry.lastAccess <= CONVERSATION_TTL_MS) break; // the rest are newer
+    userConversations.delete(userId);
   }
-  // Hard cap: evict oldest if over limit
-  if (userConversations.size > MAX_USERS) {
-    let oldest = null;
-    let oldestTime = Infinity;
-    for (const [userId, entry] of userConversations) {
-      if (entry.lastAccess < oldestTime) {
-        oldest = userId;
-        oldestTime = entry.lastAccess;
-      }
-    }
-    if (oldest) userConversations.delete(oldest);
+  for (const [userId, entry] of rateLimitMap) {
+    if (now >= entry.resetAt) rateLimitMap.delete(userId);
   }
 }
 
 // Run eviction every 5 minutes
-setInterval(evictStaleConversations, 5 * 60 * 1000);
+setInterval(evictStaleEntries, 5 * 60 * 1000).unref();
 
 // --- Axios instance with timeout ---
 const API_BASE = 'https://api.1min.ai/api';
@@ -95,19 +87,62 @@ function createApiClient() {
 // --- Helpers ---
 const MAX_PROMPT_LENGTH = 2000;
 
-function sanitizeResponse(text) {
-  if (typeof text !== 'string') return text;
-  // Strip Discord mentions that could cause mass pings
-  return text.replace(/@(everyone|here)/g, '@\u200b$1');
+// Next real <tag> opener (tag name followed by whitespace or ">") at or after `from`
+function findTag(text, tag, from) {
+  const open = `<${tag}`;
+  for (let i = text.indexOf(open, from); i !== -1; i = text.indexOf(open, i + 1)) {
+    if (/[\s>]/.test(text.charAt(i + open.length))) return i;
+  }
+  return -1;
+}
+
+// Index of the ">" ending the tag that starts at `start`, skipping quoted attribute values
+function findTagEnd(text, start) {
+  let quoted = false;
+  for (let i = start; i < text.length; i++) {
+    if (text[i] === '"') quoted = !quoted;
+    else if (text[i] === '>' && !quoted) return i;
+  }
+  return -1;
 }
 
 // CODE_GENERATOR replies use 1min.ai's web UI format: <thinking>...</thinking>
-// followed by <artifact language="js">code</artifact>. Convert to Discord markdown.
-function formatArtifacts(text) {
-  return text
-    .replace(/<thinking>[\s\S]*?<\/thinking>\s*/g, '')
-    .replace(/<artifact\b([^>]*)>\n?([\s\S]*?)\n?<\/artifact>/g, (_, attrs, code) =>
-      '```' + (attrs.match(/language="([^"]*)"/)?.[1] ?? '') + '\n' + code + '\n```');
+// blocks and <artifact language="js">code</artifact> blocks. Drop the reasoning and
+// turn artifacts into Discord code blocks. One forward pass with indexOf (no lazy
+// regexes), so hostile output stays linear-time; tags inside an artifact are code.
+// ponytail: a literal </artifact> or ``` inside code ends the block early, like 1min.ai's own UI.
+function formatCodeReply(text) {
+  let out = '';
+  let pos = 0;
+  let thinking = findTag(text, 'thinking', 0);
+  let artifact = findTag(text, 'artifact', 0);
+
+  while (thinking !== -1 || artifact !== -1) {
+    const isThinking = thinking !== -1 && (artifact === -1 || thinking < artifact);
+    const start = isThinking ? thinking : artifact;
+    const closeTag = isThinking ? '</thinking>' : '</artifact>';
+    const openEnd = findTagEnd(text, start);
+    const close = openEnd === -1 ? -1 : text.indexOf(closeTag, openEnd);
+
+    if (close === -1) {
+      // Unclosed reasoning with nothing before it means the reply was cut off mid-thought
+      if (isThinking && !(out + text.slice(pos, start)).trim()) pos = text.length;
+      break;
+    }
+
+    out += text.slice(pos, start);
+    pos = close + closeTag.length;
+    if (isThinking) {
+      while (/\s/.test(text.charAt(pos))) pos++;
+    } else {
+      const lang = text.slice(start, openEnd).match(/language="([^"]*)"/)?.[1] ?? '';
+      out += '```' + lang + '\n' + text.slice(openEnd + 1, close).replace(/^\n|\n$/g, '') + '\n```';
+    }
+
+    if (thinking !== -1 && thinking < pos) thinking = findTag(text, 'thinking', pos);
+    if (artifact !== -1 && artifact < pos) artifact = findTag(text, 'artifact', pos);
+  }
+  return out + text.slice(pos);
 }
 
 // Model roster from https://api.1min.ai/models?feature=UNIFY_CHAT_WITH_AI|CODE_GENERATOR
@@ -234,6 +269,11 @@ module.exports = {
 
     let progressTimer = null;
     let progressDone = false;
+    // Must run before the final editReply, or a late tick can overwrite the answer
+    const stopProgress = () => {
+      progressDone = true;
+      clearInterval(progressTimer);
+    };
 
     try {
       // Handle reset subcommand
@@ -335,6 +375,8 @@ module.exports = {
         });
       }
 
+      stopProgress();
+
       // Extract response from API (resultObject is a list of strings)
       const resultObject = apiResponse.data?.aiRecord?.aiRecordDetail?.resultObject ??
         apiResponse.data?.result?.response;
@@ -349,8 +391,8 @@ module.exports = {
 
       let resultText = Array.isArray(resultObject) ? resultObject.join('\n') : String(resultObject);
 
-      // Sanitize Discord mentions
-      resultText = sanitizeResponse(formatArtifacts(resultText));
+      if (subcommand === 'code') resultText = formatCodeReply(resultText);
+      if (!resultText.trim()) throw new Error('AI API response is empty');
 
       // Determine model used
       const modelUsed = interaction.options.getString('model') ||
@@ -373,6 +415,7 @@ module.exports = {
       }
 
     } catch (error) {
+      stopProgress();
       const apiCode = error.apiCode ?? error.response?.data?.errorCode ?? error.response?.data?.code;
       console.error('AI API Error:', error.response?.status, apiCode ?? '', error.message);
 
@@ -395,8 +438,9 @@ module.exports = {
         // Interaction may have expired
       }
     } finally {
-      progressDone = true;
-      if (progressTimer) clearInterval(progressTimer);
+      stopProgress();
     }
-  }
+  },
+
+  formatCodeReply
 };

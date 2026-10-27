@@ -6,7 +6,7 @@
  *
  * Usage: bun run check:models [model-substring]
  *
- * Version: 2.0.1
+ * Version: 2.0.2
  * Author: gl0bal01
  */
 

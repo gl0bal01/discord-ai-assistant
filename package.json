@@ -1,6 +1,6 @@
 {
   "name": "discord-ai-assistant",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "A Discord bot that provides AI chat functionality with multiple models including GPT-6, Claude, Gemini, Grok, and others",
   "main": "index.js",
   "scripts": {
@@ -8,7 +8,8 @@
     "dev": "nodemon index.js",
     "deploy": "node deploy-commands.js",
     "deploy:global": "GUILD_ID= node deploy-commands.js",
-    "check:models": "node scripts/check-models.js"
+    "check:models": "node scripts/check-models.js",
+    "test": "node --test"
   },
   "keywords": [
     "discord",

@@ -155,6 +155,7 @@ discord-ai-assistant/
 │   └── ai.js            # All /ai subcommands
 ├── scripts/
 │   └── check-models.js  # Live smoke test of every model choice
+├── test/                 # Offline tests (bun run test)
 ├── index.js              # Bot client, command loader, event handlers
 ├── deploy-commands.js    # Slash command registration script
 ├── .env.example          # Environment template
