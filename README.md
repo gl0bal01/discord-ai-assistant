@@ -4,7 +4,7 @@
 [![Node.js](https://img.shields.io/badge/node-%3E%3D22-brightgreen.svg)](https://nodejs.org/)
 [![DOI](https://zenodo.org/badge/1005640682.svg)](https://doi.org/10.5281/zenodo.15722664)
 
-A lightweight Discord bot that gives every member of your server access to 25+ current AI models (Claude 5.5, GPT-6, Gemini 4, Grok 4.7, DeepSeek V4, Kimi K3, Sonar, and others) through a single `/ai` slash command — all routed through the [1min.ai](https://1min.ai) API.
+A lightweight Discord bot that gives every member of your server access to 22 current AI models (Claude 5.5, GPT-6, Gemini 4, Grok 4.7, DeepSeek V4, Kimi K3, Sonar, and others) through a single `/ai` slash command — all routed through the [1min.ai](https://1min.ai) API.
 
 No per-model API keys. No heavyweight framework. One `.env`, three dependencies, and you're running.
 
